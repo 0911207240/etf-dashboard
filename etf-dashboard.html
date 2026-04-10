@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ETF 投資全方位追蹤器</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #ffffff; --bg2: #f5f5f0; --bg3: #ebebeb;
+    --text: #1a1a1a; --text2: #666; --text3: #999;
+    --border: rgba(0,0,0,0.12); --border2: rgba(0,0,0,0.22);
+    --blue-bg: #E6F1FB; --blue-text: #0C447C;
+    --green: #1D9E75; --amber: #BA7517; --red: #D85A30;
+    --green-bg: #E1F5EE; --green-text: #085041;
+    --amber-bg: #FAEEDA; --amber-text: #633806;
+    --red-bg: #FCEBEB; --red-text: #791F1F;
+    --radius: 8px; --radius-lg: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1e; --bg2: #2c2c2e; --bg3: #3a3a3c;
+      --text: #f0f0f0; --text2: #aaa; --text3: #666;
+      --border: rgba(255,255,255,0.12); --border2: rgba(255,255,255,0.22);
+      --blue-bg: #0c2a44; --blue-text: #85B7EB;
+      --green-bg: #0a2e1e; --green-text: #5DCAA5;
+      --amber-bg: #2e1f00; --amber-text: #EF9F27;
+      --red-bg: #2e0a0a; --red-text: #F09595;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg3); color: var(--text); min-height: 100vh; }
+  header { background: var(--bg); border-bottom: 0.5px solid var(--border); padding: 14px 20px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 100; }
+  header h1 { font-size: 16px; font-weight: 500; }
+  header span { font-size: 11px; color: var(--text3); background: var(--bg2); padding: 3px 8px; border-radius: 20px; }
+  .container { max-width: 760px; margin: 0 auto; padding: 16px; }
+  .tabs { display: flex; gap: 2px; background: var(--bg2); border-radius: var(--radius-lg); padding: 4px; margin-bottom: 16px; }
+  .tab { flex: 1; padding: 8px 4px; font-size: 13px; cursor: pointer; color: var(--text2); border: none; background: none; border-radius: var(--radius); font-family: inherit; transition: all .2s; }
+  .tab.active { background: var(--bg); color: var(--text); font-weight: 500; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+  .pane { display: none; } .pane.show { display: block; }
+  .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .metric { background: var(--bg2); border-radius: var(--radius); padding: 14px 12px; }
+  .metric-label { font-size: 11px; color: var(--text2); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .05em; }
+  .metric-value { font-size: 20px; font-weight: 500; }
+  .metric-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .pos { color: var(--green); } .neg { color: var(--red); } .warn { color: var(--amber); }
+  .card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; margin-bottom: 12px; }
+  .sec { font-size: 11px; font-weight: 500; color: var(--text2); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 10px; }
+  .row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .row label { font-size: 13px; color: var(--text2); min-width: 110px; }
+  input[type=number], input[type=text], select {
+    border: 0.5px solid var(--border2); border-radius: var(--radius); padding: 7px 10px;
+    font-size: 13px; background: var(--bg); color: var(--text); font-family: inherit; width: 140px;
+  }
+  input[type=range] { flex: 1; min-width: 80px; accent-color: var(--green); }
+  select { width: auto; }
+  button {
+    background: transparent; border: 0.5px solid var(--border2); border-radius: var(--radius);
+    padding: 7px 16px; font-size: 13px; cursor: pointer; color: var(--text); font-family: inherit; transition: background .15s;
+  }
+  button:hover { background: var(--bg2); }
+  button.prim { background: var(--blue-bg); color: var(--blue-text); border-color: transparent; }
+  button.sm { padding: 4px 10px; font-size: 12px; }
+  button.danger { color: var(--red); border-color: transparent; padding: 3px 8px; font-size: 12px; }
+  .alert { border-radius: var(--radius); padding: 10px 14px; font-size: 13px; margin-bottom: 10px; display: flex; gap: 8px; line-height: 1.5; }
+  .alert-safe { background: var(--green-bg); color: var(--green-text); }
+  .alert-warn { background: var(--amber-bg); color: var(--amber-text); }
+  .alert-danger { background: var(--red-bg); color: var(--red-text); }
+  .badge { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 20px; background: var(--blue-bg); color: var(--blue-text); }
+  .badge-amber { background: var(--amber-bg); color: var(--amber-text); }
+  .goal-bar-wrap { height: 8px; background: var(--bg2); border-radius: 20px; overflow: hidden; margin: 8px 0 4px; }
+  .goal-bar { height: 8px; background: var(--green); border-radius: 20px; transition: width .4s; }
+  .pledge-bar-wrap { height: 14px; background: var(--bg2); border-radius: 20px; overflow: hidden; margin: 8px 0; }
+  .pledge-bar { height: 14px; border-radius: 20px; transition: width .4s; }
+  .pledge-zones { display: flex; font-size: 10px; color: var(--text3); justify-content: space-between; margin-bottom: 4px; }
+  .etf-mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .etf-mini { background: var(--bg2); border-radius: var(--radius); padding: 10px 12px; }
+  .etf-mini label { font-size: 12px; color: var(--text2); display: block; margin-bottom: 4px; }
+  .etf-mini input { width: 100%; margin-bottom: 6px; }
+  .hist-head { display: grid; grid-template-columns: 70px 1fr 1fr 70px 1fr 28px; gap: 8px; font-size: 11px; color: var(--text2); font-weight: 500; margin-bottom: 6px; padding: 0 2px; }
+  .hist-row { display: grid; grid-template-columns: 70px 1fr 1fr 70px 1fr 28px; gap: 8px; align-items: center; font-size: 13px; margin-bottom: 8px; }
+  .chart-area { position: relative; width: 100%; height: 200px; margin-bottom: 14px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; font-size: 12px; color: var(--text2); }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+  .save-note { font-size: 11px; color: var(--text3); text-align: center; padding: 8px; }
+  footer { text-align: center; padding: 24px 16px; font-size: 11px; color: var(--text3); }
+  @media (max-width: 500px) {
+    .metrics { grid-template-columns: 1fr 1fr; }
+    .etf-mini-grid { grid-template-columns: 1fr; }
+    .hist-head, .hist-row { grid-template-columns: 60px 1fr 1fr 28px; }
+    .hist-head span:nth-child(4), .hist-head span:nth-child(5),
+    .hist-row span:nth-child(4), .hist-row span:nth-child(5) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ETF 投資追蹤器</h1>
+  <span>資料儲存於本機</span>
+</header>
+
+<div class="container">
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('div',this)">配息試算</button>
+    <button class="tab" onclick="showTab('compound',this)">複利成長</button>
+    <button class="tab" onclick="showTab('pledge',this)">質押槓桿</button>
+    <button class="tab" onclick="showTab('history',this)">月記錄</button>
+  </div>
+
+  <!-- 配息試算 -->
+  <div id="pane-div" class="pane show">
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">預估月配息</div><div class="metric-value pos" id="d-monthly">$0</div><div class="metric-sub" id="d-pct">達成 0%</div></div>
+      <div class="metric"><div class="metric-label">距離目標</div><div class="metric-value neg" id="d-gap">$10,000</div><div class="metric-sub" id="d-goal-lbl">目標 $10,000</div></div>
+      <div class="metric"><div class="metric-label">預估年配息</div><div class="metric-value" id="d-annual">$0</div><div class="metric-sub">年度合計</div></div>
+    </div>
+    <div class="goal-bar-wrap"><div class="goal-bar" id="d-bar" style="width:0%"></div></div>
+
+    <div class="card">
+      <div class="sec">目標設定</div>
+      <div class="row"><label>月領目標（元）</label><input type="number" id="goal" value="10000" step="500" oninput="calcDiv();save()"></div>
+    </div>
+
+    <div class="card">
+      <div class="sec">ETF 配息設定</div>
+      <div class="etf-mini-grid">
+        <div class="etf-mini">
+          <div style="font-size:12px;margin-bottom:8px">00929 <span class="badge">月配</span></div>
+          <label>每股配息（元）</label><input type="number" id="d-00929" value="0.10" step="0.01" oninput="calcDiv();save()">
+          <label>持有股數</label><input type="number" id="s-00929" value="15" step="1" oninput="calcDiv();save()">
+        </div>
+        <div class="etf-mini">
+          <div style="font-size:12px;margin-bottom:8px">00878 <span class="badge">月配</span></div>
+          <label>每股配息（元）</label><input type="number" id="d-00878" value="0.08" step="0.01" oninput="calcDiv();save()">
+          <label>持有股數</label><input type="number" id="s-00878" value="0" step="1" oninput="calcDiv();save()">
+        </div>
+        <div class="etf-mini">
+          <div style="font-size:12px;margin-bottom:8px">00919 <span class="badge">月配</span></div>
+          <label>每股配息（元）</label><input type="number" id="d-00919" value="0.09" step="0.01" oninput="calcDiv();save()">
+          <label>持有股數</label><input type="number" id="s-00919" value="0" step="1" oninput="calcDiv();save()">
+        </div>
+        <div class="etf-mini">
+          <div style="font-size:12px;margin-bottom:8px">0056 <span class="badge badge-amber">季配</span></div>
+          <label>每股配息（元）</label><input type="number" id="d-0056" value="1.0" step="0.1" oninput="calcDiv();save()">
+          <label>持有股數</label><input type="number" id="s-0056" value="0" step="1" oninput="calcDiv();save()">
+        </div>
+      </div>
+    </div>
+
+    <div class="legend" id="d-legend"></div>
+    <div class="chart-area"><canvas id="divChart" role="img" aria-label="各ETF月配息金額">配息分佈圖</canvas></div>
+  </div>
+
+  <!-- 複利成長 -->
+  <div id="pane-compound" class="pane">
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">最終資產</div><div class="metric-value pos" id="c-final">$0</div><div class="metric-sub" id="c-years-lbl">0 年後</div></div>
+      <div class="metric"><div class="metric-label">總投入本金</div><div class="metric-value" id="c-principal">$0</div><div class="metric-sub">累積定投</div></div>
+      <div class="metric"><div class="metric-label">複利獲利</div><div class="metric-value pos" id="c-profit">$0</div><div class="metric-sub" id="c-roi">報酬率 0%</div></div>
+    </div>
+    <div class="card">
+      <div class="sec">複利試算參數</div>
+      <div class="row"><label>初始本金（元）</label><input type="number" id="c-init" value="100000" step="10000" oninput="calcCompound();save()"></div>
+      <div class="row"><label>每月定投（元）</label><input type="number" id="c-monthly" value="5000" step="1000" oninput="calcCompound();save()"></div>
+      <div class="row">
+        <label>年化報酬率</label>
+        <input type="range" id="c-rate" min="1" max="20" value="8" step="0.5" oninput="document.getElementById('c-rate-out').textContent=this.value+'%';calcCompound();save()">
+        <span id="c-rate-out" style="font-size:14px;font-weight:500;min-width:40px">8%</span>
+      </div>
+      <div class="row">
+        <label>投資年數</label>
+        <input type="range" id="c-years" min="1" max="40" value="10" step="1" oninput="document.getElementById('c-years-out').textContent=this.value+'年';calcCompound();save()">
+        <span id="c-years-out" style="font-size:14px;font-weight:500;min-width:36px">10年</span>
+      </div>
+      <div class="row"><label>配息再投入</label><select id="c-reinvest" onchange="calcCompound();save()"><option value="1">是（複利最大化）</option><option value="0">否（配息提取）</option></select></div>
+    </div>
+    <div class="legend">
+      <span><i style="background:#1D9E75"></i>總資產</span>
+      <span><i style="background:#85B7EB;border:1px dashed #378ADD"></i>投入本金</span>
+    </div>
+    <div class="chart-area" style="height:240px"><canvas id="compChart" role="img" aria-label="複利資產成長曲線">複利成長圖</canvas></div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:12px">* 試算採年化複利，實際報酬因市場波動而異，僅供參考</div>
+  </div>
+
+  <!-- 質押槓桿 -->
+  <div id="pane-pledge" class="pane">
+    <div id="pledge-alerts"></div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">可借款上限</div><div class="metric-value" id="p-loan">$0</div><div class="metric-sub">質押成數內</div></div>
+      <div class="metric"><div class="metric-label">年利息成本</div><div class="metric-value warn" id="p-interest">$0</div><div class="metric-sub" id="p-int-month">月付 $0</div></div>
+      <div class="metric"><div class="metric-label">槓桿倍率</div><div class="metric-value" id="p-leverage">1.0x</div><div class="metric-sub" id="p-safe-lbl">安全</div></div>
+    </div>
+    <div class="card">
+      <div class="sec">質押試算</div>
+      <div class="row"><label>股票市值（元）</label><input type="number" id="p-value" value="500000" step="10000" oninput="calcPledge();save()"></div>
+      <div class="row"><label>質押成數（%）</label><input type="number" id="p-ratio" value="60" step="5" min="10" max="90" oninput="calcPledge();save()"></div>
+      <div class="row"><label>實際借款（元）</label><input type="number" id="p-borrow" value="200000" step="10000" oninput="calcPledge();save()"></div>
+      <div class="row"><label>借款年利率（%）</label><input type="number" id="p-rate" value="3.5" step="0.1" min="1" max="20" oninput="calcPledge();save()"></div>
+      <div class="row"><label>預期年報酬（%）</label><input type="number" id="p-return" value="8" step="0.5" oninput="calcPledge();save()"></div>
+    </div>
+    <div class="card">
+      <div class="sec">安全區示意</div>
+      <div class="pledge-zones"><span>0%</span><span>安全 &lt;50%</span><span>警戒 50-75%</span><span>危險 &gt;75%</span><span>100%</span></div>
+      <div class="pledge-bar-wrap"><div class="pledge-bar" id="p-bar" style="width:0%;background:var(--green)"></div></div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px" id="p-bar-label">借款佔質押上限 0%</div>
+    </div>
+    <div class="card">
+      <div class="sec">槓桿原則提醒</div>
+      <div class="alert alert-safe"><div>✓</div><div><strong>安全做法：</strong>借款不超過股票市值 30-40%，即便股價下跌 30% 也有足夠緩衝，不觸發追繳。</div></div>
+      <div class="alert alert-warn"><div>⚠</div><div><strong>警戒區（50-75%）：</strong>股價下跌 15-25% 可能面臨追繳保證金（Margin Call）。建議預留現金備援 10%。</div></div>
+      <div class="alert alert-danger"><div>⚠</div><div><strong>危險區（>75%）：</strong>股價小幅波動即可能遭強制平倉，造成永久性虧損。強烈不建議。</div></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">借款利率需低於投資報酬率才有正套利空間。建議槓桿倍數不超過 1.5x。</div>
+    </div>
+  </div>
+
+  <!-- 月記錄 -->
+  <div id="pane-history" class="pane">
+    <div class="card">
+      <div class="sec">新增月記錄</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div><div style="font-size:12px;color:var(--text2);margin-bottom:4px">年月</div><input type="text" id="h-month" placeholder="2025-04" style="width:100%"></div>
+        <div><div style="font-size:12px;color:var(--text2);margin-bottom:4px">股息收入（元）</div><input type="number" id="h-income" placeholder="1500" style="width:100%"></div>
+        <div><div style="font-size:12px;color:var(--text2);margin-bottom:4px">定投金額（元）</div><input type="number" id="h-invest" placeholder="10000" style="width:100%"></div>
+        <div><div style="font-size:12px;color:var(--text2);margin-bottom:4px">主要標的</div><input type="text" id="h-target" placeholder="00929" style="width:100%"></div>
+        <div style="grid-column:1/-1"><div style="font-size:12px;color:var(--text2);margin-bottom:4px">備註</div><input type="text" id="h-note" placeholder="選填備註" style="width:100%"></div>
+      </div>
+      <button class="prim" onclick="addHistory()">+ 新增這筆</button>
+    </div>
+
+    <div id="hist-metrics" style="display:none" class="metrics">
+      <div class="metric"><div class="metric-label">累積股息</div><div class="metric-value pos" id="h-total-income">$0</div><div class="metric-sub">歷史合計</div></div>
+      <div class="metric"><div class="metric-label">累積定投</div><div class="metric-value" id="h-total-invest">$0</div><div class="metric-sub">歷史合計</div></div>
+      <div class="metric"><div class="metric-label">平均月股息</div><div class="metric-value" id="h-avg">$0</div><div class="metric-sub">所有記錄均值</div></div>
+    </div>
+
+    <div class="chart-area" id="h-chart-area" style="display:none;height:180px"><canvas id="histChart" role="img" aria-label="歷史月股息趨勢">歷史股息折線圖</canvas></div>
+
+    <div id="hist-list">
+      <div style="text-align:center;padding:2rem;font-size:13px;color:var(--text3)">尚無記錄，新增第一筆吧！</div>
+    </div>
+    <div class="save-note">記錄自動儲存於本裝置瀏覽器中</div>
+  </div>
+
+</div>
+
+<footer>ETF 投資追蹤器 · 資料僅供參考，投資有風險</footer>
+
+<script>
+const COLORS = ['#1D9E75','#378ADD','#BA7517','#D85A30','#534AB7'];
+let histData = [];
+let divC = null, compC = null, histC = null;
+
+// ── Tab ──
+function showTab(name, el) {
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('show'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('pane-' + name).classList.add('show');
+  el.classList.add('active');
+  if (name === 'compound') calcCompound();
+  if (name === 'pledge') calcPledge();
+  if (name === 'history') renderHistory();
+}
+
+// ── helpers ──
+function getV(id) { return parseFloat(document.getElementById(id).value) || 0; }
+function fmt(n) { return Math.round(n).toLocaleString('zh-TW'); }
+
+// ── localStorage ──
+function save() {
+  const data = {
+    goal: getV('goal'),
+    'd-00929': getV('d-00929'), 's-00929': getV('s-00929'),
+    'd-00878': getV('d-00878'), 's-00878': getV('s-00878'),
+    'd-00919': getV('d-00919'), 's-00919': getV('s-00919'),
+    'd-0056': getV('d-0056'), 's-0056': getV('s-0056'),
+    'c-init': getV('c-init'), 'c-monthly': getV('c-monthly'),
+    'c-rate': getV('c-rate'), 'c-years': getV('c-years'),
+    'c-reinvest': document.getElementById('c-reinvest').value,
+    'p-value': getV('p-value'), 'p-ratio': getV('p-ratio'),
+    'p-borrow': getV('p-borrow'), 'p-rate': getV('p-rate'), 'p-return': getV('p-return'),
+    histData: histData
+  };
+  localStorage.setItem('etf-dashboard', JSON.stringify(data));
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem('etf-dashboard');
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    const setVal = (id, v) => { if (v !== undefined && document.getElementById(id)) document.getElementById(id).value = v; };
+    setVal('goal', d.goal);
+    setVal('d-00929', d['d-00929']); setVal('s-00929', d['s-00929']);
+    setVal('d-00878', d['d-00878']); setVal('s-00878', d['s-00878']);
+    setVal('d-00919', d['d-00919']); setVal('s-00919', d['s-00919']);
+    setVal('d-0056', d['d-0056']); setVal('s-0056', d['s-0056']);
+    setVal('c-init', d['c-init']); setVal('c-monthly', d['c-monthly']);
+    setVal('c-rate', d['c-rate']); setVal('c-years', d['c-years']);
+    if (d['c-reinvest']) document.getElementById('c-reinvest').value = d['c-reinvest'];
+    setVal('p-value', d['p-value']); setVal('p-ratio', d['p-ratio']);
+    setVal('p-borrow', d['p-borrow']); setVal('p-rate', d['p-rate']); setVal('p-return', d['p-return']);
+    if (d['c-rate']) document.getElementById('c-rate-out').textContent = d['c-rate'] + '%';
+    if (d['c-years']) document.getElementById('c-years-out').textContent = d['c-years'] + '年';
+    if (d.histData) histData = d.histData;
+  } catch(e) {}
+}
+
+// ── 配息試算 ──
+function calcDiv() {
+  const goal = getV('goal');
+  const etfs = [
+    { id: '00929', freq: 1 }, { id: '00878', freq: 1 },
+    { id: '00919', freq: 1 }, { id: '0056', freq: 1/3 }
+  ];
+  let sources = [];
+  etfs.forEach(e => {
+    const d = getV('d-' + e.id), s = getV('s-' + e.id);
+    const m = d * s * e.freq;
+    if (s > 0 && d > 0) sources.push({ label: e.id, monthly: m });
+  });
+  const total = sources.reduce((a, b) => a + b.monthly, 0);
+  const gap = goal - total;
+  const pct = Math.min(100, total / goal * 100);
+
+  document.getElementById('d-monthly').textContent = '$' + fmt(total);
+  document.getElementById('d-monthly').className = 'metric-value ' + (total >= goal ? 'pos' : '');
+  document.getElementById('d-gap').textContent = gap <= 0 ? '已達成!' : '$' + fmt(gap);
+  document.getElementById('d-gap').className = 'metric-value ' + (gap <= 0 ? 'pos' : 'neg');
+  document.getElementById('d-pct').textContent = '達成 ' + pct.toFixed(1) + '%';
+  document.getElementById('d-goal-lbl').textContent = '目標 $' + fmt(goal);
+  document.getElementById('d-annual').textContent = '$' + fmt(total * 12);
+  document.getElementById('d-bar').style.width = pct.toFixed(1) + '%';
+
+  document.getElementById('d-legend').innerHTML = sources.map((s, i) =>
+    `<span><i style="background:${COLORS[i % 5]}"></i>${s.label} $${fmt(s.monthly)}/月</span>`).join('');
+
+  if (divC) { divC.destroy(); divC = null; }
+  if (!sources.length) return;
+  divC = new Chart(document.getElementById('divChart'), {
+    type: 'bar',
+    data: { labels: sources.map(s => s.label), datasets: [{ data: sources.map(s => Math.round(s.monthly)), backgroundColor: sources.map((_, i) => COLORS[i % 5]), borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' $' + c.raw.toLocaleString() + '/月' } } }, scales: { x: { grid: { display: false }, ticks: { color: '#888' } }, y: { grid: { color: 'rgba(128,128,128,.12)' }, ticks: { color: '#888', callback: v => '$' + v.toLocaleString() } } } }
+  });
+}
+
+// ── 複利成長 ──
+function calcCompound() {
+  const init = getV('c-init'), monthly = getV('c-monthly');
+  const rateY = getV('c-rate') / 100, years = getV('c-years') || 10;
+  const reinvest = document.getElementById('c-reinvest').value === '1';
+  const labels = [], totals = [], principals = [];
+  let asset = init, principal = init;
+  const mRate = Math.pow(1 + rateY, 1/12) - 1;
+  labels.push('現在'); totals.push(Math.round(asset)); principals.push(Math.round(principal));
+  for (let y = 1; y <= years; y++) {
+    for (let m = 0; m < 12; m++) {
+      asset = asset * (1 + mRate) + (reinvest ? monthly : 0);
+      if (!reinvest) asset += monthly;
+      principal += monthly;
+    }
+    labels.push(y + '年'); totals.push(Math.round(asset)); principals.push(Math.round(principal));
+  }
+  const profit = asset - principal;
+  document.getElementById('c-final').textContent = '$' + fmt(asset);
+  document.getElementById('c-principal').textContent = '$' + fmt(principal);
+  document.getElementById('c-profit').textContent = '$' + fmt(profit);
+  document.getElementById('c-roi').textContent = '報酬率 ' + (profit / principal * 100).toFixed(1) + '%';
+  document.getElementById('c-years-lbl').textContent = years + ' 年後';
+
+  if (compC) { compC.destroy(); compC = null; }
+  compC = new Chart(document.getElementById('compChart'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { label: '總資產', data: totals, borderColor: '#1D9E75', backgroundColor: 'rgba(29,158,117,.08)', fill: true, tension: .4, pointRadius: 2, borderWidth: 2 },
+      { label: '投入本金', data: principals, borderColor: '#85B7EB', backgroundColor: 'rgba(133,183,235,.06)', fill: true, tension: .4, pointRadius: 2, borderWidth: 1.5, borderDash: [4, 3] }
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' $' + c.raw.toLocaleString() } } }, scales: { x: { grid: { display: false }, ticks: { color: '#888', font: { size: 11 }, maxTicksLimit: 8 } }, y: { grid: { color: 'rgba(128,128,128,.1)' }, ticks: { color: '#888', callback: v => v >= 1000000 ? '$' + (v / 1000000).toFixed(1) + 'M' : '$' + (v / 1000).toFixed(0) + 'K' } } } }
+  });
+}
+
+// ── 質押槓桿 ──
+function calcPledge() {
+  const val = getV('p-value'), ratio = getV('p-ratio'), borrow = getV('p-borrow');
+  const rate = getV('p-rate') / 100, ret = getV('p-return') / 100;
+  const maxLoan = val * ratio / 100;
+  const interest = borrow * rate;
+  const leverage = (val + borrow) / val;
+  const pct = maxLoan > 0 ? Math.min(100, borrow / maxLoan * 100) : 0;
+
+  document.getElementById('p-loan').textContent = '$' + fmt(maxLoan);
+  document.getElementById('p-interest').textContent = '$' + fmt(interest);
+  document.getElementById('p-int-month').textContent = '月付 $' + fmt(interest / 12);
+  document.getElementById('p-leverage').textContent = leverage.toFixed(2) + 'x';
+
+  const bar = document.getElementById('p-bar');
+  bar.style.width = pct.toFixed(1) + '%';
+  bar.style.background = pct < 50 ? '#1D9E75' : pct < 75 ? '#BA7517' : '#D85A30';
+  document.getElementById('p-bar-label').textContent = '借款佔質押上限 ' + pct.toFixed(1) + '%';
+
+  let level = '安全區', cls = 'pos';
+  if (pct >= 75) { level = '高度危險'; cls = 'neg'; }
+  else if (pct >= 50) { level = '警戒中'; cls = 'warn'; }
+  document.getElementById('p-safe-lbl').textContent = level;
+  document.getElementById('p-leverage').className = 'metric-value ' + cls;
+
+  const net = borrow * ret - interest;
+  const netMsg = net >= 0 ? `正套利 +$${fmt(net)}/年` : `負套利 −$${fmt(Math.abs(net))}/年（虧損）`;
+  const netClass = net >= 0 ? 'alert-safe' : 'alert-danger';
+  let html = `<div class="alert ${netClass}"><div>${net >= 0 ? '✓' : '⚠'}</div><div>借款 $${fmt(borrow)} × 預期報酬 ${(ret*100).toFixed(1)}% − 利息 ${(rate*100).toFixed(1)}% = ${netMsg}</div></div>`;
+  if (pct >= 75) html += `<div class="alert alert-danger"><div>⚠</div><div>借款超過質押上限 75%，隨時可能被追繳或強制平倉！</div></div>`;
+  else if (pct >= 50) html += `<div class="alert alert-warn"><div>⚠</div><div>進入警戒區，建議降低借款或增加股票市值做緩衝。</div></div>`;
+  else html += `<div class="alert alert-safe"><div>✓</div><div>目前在安全區，保持借款不超過市值 40% 可有效降低風險。</div></div>`;
+  document.getElementById('pledge-alerts').innerHTML = html;
+}
+
+// ── 月記錄 ──
+function addHistory() {
+  const month = document.getElementById('h-month').value.trim();
+  const income = getV('h-income'), invest = getV('h-invest');
+  const target = document.getElementById('h-target').value.trim();
+  const note = document.getElementById('h-note').value.trim();
+  if (!month || (!income && !invest)) { alert('請填寫年月及至少一項數值'); return; }
+  histData.push({ month, income, invest, target, note, id: Date.now() });
+  histData.sort((a, b) => a.month.localeCompare(b.month));
+  ['h-month','h-income','h-invest','h-target','h-note'].forEach(id => document.getElementById(id).value = '');
+  save(); renderHistory();
+}
+
+function removeHistory(id) {
+  histData = histData.filter(h => h.id !== id);
+  save(); renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById('hist-list');
+  if (!histData.length) {
+    list.innerHTML = '<div style="text-align:center;padding:2rem;font-size:13px;color:var(--text3)">尚無記錄，新增第一筆吧！</div>';
+    document.getElementById('hist-metrics').style.display = 'none';
+    document.getElementById('h-chart-area').style.display = 'none';
+    return;
+  }
+  document.getElementById('hist-metrics').style.display = 'grid';
+  document.getElementById('h-chart-area').style.display = 'block';
+  const totalIncome = histData.reduce((a, b) => a + b.income, 0);
+  const totalInvest = histData.reduce((a, b) => a + b.invest, 0);
+  const avg = totalIncome / histData.length;
+  document.getElementById('h-total-income').textContent = '$' + fmt(totalIncome);
+  document.getElementById('h-total-invest').textContent = '$' + fmt(totalInvest);
+  document.getElementById('h-avg').textContent = '$' + fmt(avg);
+
+  list.innerHTML = `<div class="hist-head"><span>年月</span><span>股息</span><span>定投</span><span>標的</span><span>備註</span><span></span></div>` +
+    histData.map(h => `<div class="hist-row">
+      <span style="font-weight:500">${h.month}</span>
+      <span class="pos">$${fmt(h.income)}</span>
+      <span>$${fmt(h.invest)}</span>
+      <span>${h.target ? `<span class="badge">${h.target}</span>` : '—'}</span>
+      <span style="color:var(--text2);font-size:12px">${h.note || ''}</span>
+      <button class="danger" onclick="removeHistory(${h.id})">✕</button>
+    </div>`).join('');
+
+  if (histC) { histC.destroy(); histC = null; }
+  histC = new Chart(document.getElementById('histChart'), {
+    type: 'line',
+    data: { labels: histData.map(h => h.month), datasets: [{ label: '月股息', data: histData.map(h => h.income), borderColor: '#1D9E75', backgroundColor: 'rgba(29,158,117,.1)', fill: true, tension: .4, pointRadius: 4, borderWidth: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' $' + c.raw.toLocaleString() } } }, scales: { x: { grid: { display: false }, ticks: { color: '#888', font: { size: 11 } } }, y: { grid: { color: 'rgba(128,128,128,.12)' }, ticks: { color: '#888', callback: v => '$' + v.toLocaleString() } } } }
+  });
+}
+
+// ── 初始化 ──
+load();
+calcDiv();
+</script>
+
+</body>
+</html>
